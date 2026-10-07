@@ -8,8 +8,11 @@
     "mobile"
   ],
   "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:mobile\"",
     "dev:backend": "npm --workspace backend run dev",
     "dev:web": "npm --workspace web run dev",
+    "dev:mobile": "npm --workspace mobile run start",
     "install:all": "npm install --workspaces"
   },
   "devDependencies": {

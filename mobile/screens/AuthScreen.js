@@ -31,15 +31,63 @@ export default function AuthScreen({ onAuth }) {
     <View style={styles.container}>
       <Text style={styles.title}>SafeLanka</Text>
       {mode === 'signup' && (
-        <TextInput style={styles.input} placeholder="Full name" value={fullName} onChangeText={setFullName} />
+        <TextInput
+          id="fullName"
+          name="fullName"
+          autoComplete="name"
+          textContentType="name"
+          style={styles.input}
+          placeholder="Full name"
+          value={fullName}
+          onChangeText={setFullName}
+        />
       )}
-      <TextInput style={styles.input} placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
+      <TextInput
+        id="email"
+        name="email"
+        autoComplete="email"
+        textContentType="emailAddress"
+        keyboardType="email-address"
+        style={styles.input}
+        placeholder="Email"
+        autoCapitalize="none"
+        value={email}
+        onChangeText={setEmail}
+      />
       {mode === 'signup' && (
-        <TextInput style={styles.input} placeholder="Mobile" value={mobileNo} onChangeText={setMobileNo} />
+        <TextInput
+          id="mobileNo"
+          name="tel"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          keyboardType="phone-pad"
+          style={styles.input}
+          placeholder="Mobile"
+          value={mobileNo}
+          onChangeText={setMobileNo}
+        />
       )}
-      <TextInput style={styles.input} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
+      <TextInput
+        id="password"
+        name="password"
+        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+        textContentType="password"
+        style={styles.input}
+        placeholder="Password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
       {mode === 'signup' && (
-        <TextInput style={styles.input} placeholder="District" value={district} onChangeText={setDistrict} />
+        <TextInput
+          id="district"
+          name="district"
+          autoComplete="address-level2"
+          style={styles.input}
+          placeholder="District"
+          value={district}
+          onChangeText={setDistrict}
+        />
       )}
       {!!error && <Text style={styles.error}>{error}</Text>}
       <Button title={mode === 'signin' ? 'Sign in' : 'Sign up'} onPress={submit} />
