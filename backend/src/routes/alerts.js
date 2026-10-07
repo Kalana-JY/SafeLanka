@@ -15,14 +15,18 @@ import { recordAudit } from '../utils/audit.js';
 const router = Router();
 router.use(requireAuth);
 
-const langRecord = z.object({ si: z.string().default(''), ta: z.string().default(''), en: z.string().default('') });
+// English-only: accept plain string, coerce legacy { en } objects.
+const textField = z
+  .union([z.string(), z.object({ en: z.string().optional() }).passthrough()])
+  .transform((v) => (typeof v === 'string' ? v.trim() : (v.en || '').trim()))
+  .refine((v) => v.length > 0, { message: 'Required' });
 
 const createAlertSchema = z.object({
   eventId: z.string().min(1),
   targetAreaId: z.string().min(1),
   level: z.enum(WARNING_LEVELS),
-  headline: langRecord,
-  body: langRecord,
+  headline: textField,
+  body: textField,
   expiresAt: z.string().datetime()
 });
 
@@ -200,7 +204,7 @@ router.post(
       if (!alert) return res.status(404).json({ error: 'Alert not found' });
       if (alert.status !== 'DRAFT') return res.status(409).json({ error: `Only DRAFT alerts can be published (is ${alert.status})` });
       if (!alert.isComplete()) {
-        return res.status(422).json({ error: 'Publish blocked: headline and body required in si, ta and en' });
+        return res.status(422).json({ error: 'Publish blocked: headline and body required' });
       }
       const expiryErr = checkExpiry(alert.expiresAt);
       if (expiryErr) return res.status(422).json({ error: expiryErr });
@@ -302,8 +306,8 @@ router.post(
   validate(
     z.object({
       level: z.enum(WARNING_LEVELS).optional(),
-      headline: langRecord.optional(),
-      body: langRecord.optional(),
+      headline: textField.optional(),
+      body: textField.optional(),
       expiresAt: z.string().datetime()
     })
   ),

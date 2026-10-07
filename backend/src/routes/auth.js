@@ -24,7 +24,8 @@ const signupSchema = z.object({
   email: z.string().email().max(160),
   mobileNo: z.string().min(7).max(20),
   password: z.string().min(6).max(128),
-  preferredLanguage: z.enum(['si', 'ta', 'en']).default('en'),
+  // English-only: accept legacy si/ta but always store 'en'.
+  preferredLanguage: z.enum(['si', 'ta', 'en']).default('en').transform(() => 'en'),
   district: z.string().min(1).max(80)
 });
 

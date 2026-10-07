@@ -9,7 +9,7 @@ function err(e) {
 }
 
 export default function District() {
-  const { user, signout } = useAuth();
+  const { user } = useAuth();
   const { t } = useI18n();
   const [shelters, setShelters] = useState([]);
   const [msg, setMsg] = useState('');
@@ -70,7 +70,6 @@ export default function District() {
         <h1>{t('appName')} — {user?.district}</h1>
         <span className="badge">{user?.role}</span>
         <LangSwitcher />
-        <button onClick={signout}>{t('signOut')}</button>
       </header>
       <nav className="tabs">
         <button disabled={tab === 'Shelters'} onClick={() => setTab('Shelters')}>{t('shelters')}</button>

@@ -1,27 +1,14 @@
 import { useState } from 'react';
 import { Button, StyleSheet, Text, View } from 'react-native';
 import { api, clearAuth } from '../api/client';
-import { saveLang, t } from '../i18n';
+import { t } from '../i18n';
 
-const LANGS = ['en', 'si', 'ta'];
-
-export default function ProfileScreen({ user, lang, setLang, onUpdate, onSignOut }) {
+export default function ProfileScreen({ user, lang, onUpdate, onSignOut }) {
   const [msg, setMsg] = useState('');
 
   async function signOut() {
     await clearAuth();
     onSignOut();
-  }
-
-  async function switchLang(l) {
-    try {
-      const { data } = await api.patch('/users/me', { preferredLanguage: l });
-      await saveLang(l);
-      setLang(l);
-      onUpdate(data.user);
-    } catch (err) {
-      setMsg(err?.response?.data?.error || 'Language update failed');
-    }
   }
 
   async function toggleOptIn() {
@@ -44,13 +31,8 @@ export default function ProfileScreen({ user, lang, setLang, onUpdate, onSignOut
       </Text>
       <Text>District: {user?.district}</Text>
       <Text>
-        {t(lang, 'language')}: {user?.preferredLanguage}
+        {t(lang, 'language')}: English
       </Text>
-      <View style={styles.row}>
-        {LANGS.map((l) => (
-          <Button key={l} title={l.toUpperCase()} onPress={() => switchLang(l)} />
-        ))}
-      </View>
       <Button
         title={`${t(lang, 'optIn')}: ${user?.alertOptIn === false ? 'OFF' : 'ON'}`}
         onPress={toggleOptIn}
@@ -64,6 +46,5 @@ export default function ProfileScreen({ user, lang, setLang, onUpdate, onSignOut
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, gap: 8 },
   title: { fontSize: 20, fontWeight: 'bold' },
-  row: { flexDirection: 'row', gap: 8 },
   error: { color: 'red' }
 });

@@ -36,8 +36,7 @@ export default function AlertsScreen({ user }) {
     load();
   }, [load]);
 
-  const lang = user?.preferredLanguage || 'en';
-  const text = (rec) => rec?.[lang] || rec?.en || '';
+  const text = (rec) => (typeof rec === 'string' ? rec : rec?.en || '');
 
   return (
     <View style={styles.container}>

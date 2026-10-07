@@ -10,14 +10,14 @@ import { recordAudit } from '../utils/audit.js';
 const router = Router();
 router.use(requireAuth);
 
-// Self-service profile: language, alert opt-in, district, name.
+// Self-service profile: language locked to English, plus alert opt-in, district, name.
 // (Role changes stay DMC-only via PATCH /:id/role.)
 router.patch(
   '/me',
   validate(
     z.object({
       fullName: z.string().min(1).max(120).optional(),
-      preferredLanguage: z.enum(['si', 'ta', 'en']).optional(),
+      preferredLanguage: z.enum(['si', 'ta', 'en']).optional().transform((v) => (v ? 'en' : undefined)),
       alertOptIn: z.boolean().optional(),
       district: z.string().min(1).max(80).optional()
     })

@@ -8,7 +8,7 @@ function err(e) {
 }
 
 export default function Team() {
-  const { user, signout } = useAuth();
+  const { user } = useAuth();
   const { t } = useI18n();
   const [orders, setOrders] = useState([]);
   const [msg, setMsg] = useState('');
@@ -59,7 +59,6 @@ export default function Team() {
         <span className="badge">{user?.role}</span>
         <span>{user?.fullName}</span>
         <LangSwitcher />
-        <button onClick={signout}>{t('signOut')}</button>
       </header>
       {msg && <p className="error">{msg}</p>}
       <table>
