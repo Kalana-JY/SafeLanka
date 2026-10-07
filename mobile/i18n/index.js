@@ -1,20 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from './en.json';
-import si from './si.json';
-import ta from './ta.json';
 
-const DICTS = { en, si, ta };
 const KEY = 'lang';
 
-// Alert/record content stays trilingual from the API; this covers UI chrome.
-export function t(lang, key) {
-  return DICTS[lang]?.[key] ?? en[key] ?? key;
+// English-only UI. Alert content is plain English strings from the API
+// (legacy { en } objects are coerced by callers).
+
+export function t(_lang, key) {
+  return en[key] ?? key;
 }
 
 export async function getLang() {
-  return (await AsyncStorage.getItem(KEY)) || 'en';
+  return 'en';
 }
 
-export async function saveLang(lang) {
-  await AsyncStorage.setItem(KEY, lang);
-}
+export async function saveLang() {}

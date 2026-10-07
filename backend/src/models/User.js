@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
     mobileNo: { type: String, required: true, unique: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, default: 'CITIZEN', index: true },
-    preferredLanguage: { type: String, enum: ['si', 'ta', 'en'], default: 'en' },
+    preferredLanguage: { type: String, enum: ['en'], default: 'en' },
     alertOptIn: { type: Boolean, default: true },
     district: { type: String, required: true, trim: true },
     employeeNo: { type: String, unique: true, sparse: true, trim: true },

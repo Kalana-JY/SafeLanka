@@ -4,7 +4,7 @@ import { WARNING_LEVELS } from './HazardEvent.js';
 export const ALERT_STATUS = ['DRAFT', 'PUBLISHED', 'EXPIRED', 'CANCELLED'];
 export const CHANNELS = ['SMS', 'PUSH', 'SIREN'];
 
-const langText = { si: { type: String, default: '' }, ta: { type: String, default: '' }, en: { type: String, default: '' } };
+const headlineBody = { type: String, required: true, trim: true };
 
 const alertSchema = new mongoose.Schema(
   {
@@ -12,8 +12,9 @@ const alertSchema = new mongoose.Schema(
     targetAreaId: { type: mongoose.Schema.Types.ObjectId, ref: 'TargetArea', required: true },
     version: { type: Number, default: 1 },
     level: { type: String, enum: WARNING_LEVELS, required: true },
-    headline: langText,
-    body: langText,
+    // English-only (si/ta removed per requirement).
+    headline: headlineBody,
+    body: headlineBody,
     status: { type: String, enum: ALERT_STATUS, default: 'DRAFT', index: true },
     expiresAt: { type: Date, required: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -39,7 +40,8 @@ const alertSchema = new mongoose.Schema(
 );
 
 alertSchema.methods.isComplete = function () {
-  return ['si', 'ta', 'en'].every((l) => this.headline[l]?.trim() && this.body[l]?.trim());
+  const pick = (v) => (typeof v === 'string' ? v : v?.en || '');
+  return !!(pick(this.headline)?.trim() && pick(this.body)?.trim());
 };
 
 export default mongoose.model('Alert', alertSchema);

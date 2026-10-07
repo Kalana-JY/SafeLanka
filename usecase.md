@@ -16,7 +16,7 @@ Gaps:
 Improved UC-01:
 - **Trigger:** `HazardEvent.level` needs raise + officer decision.
 - **Pre:** officer has `issueAuthority(district)`, `HazardEvent` exists, `TargetArea` valid + population > 0, ≥1 `AlertChannel.enabled`.
-- **Main:** 1. create `Alert(v+1)` linked to `HazardEvent` 2. define `TargetArea` 3. `resolveRecipients()` → show count 4. set `level`, `headline/body[si,ta,en]`, `expiresAt` (mandatory) 5. `publish()` → `raiseLevel()` → `broadcast()` per channel → `DeliveryReceipt` per recipient/channel → `DeliverySummary`.
+- **Main:** 1. create `Alert(v+1)` linked to `HazardEvent` 2. define `TargetArea` 3. `resolveRecipients()` → show count 4. set `level`, `headline/body` (English only), `expiresAt` (mandatory) 5. `publish()` → `raiseLevel()` → `broadcast()` per channel → `DeliveryReceipt` per recipient/channel → `DeliverySummary`.
 - **Add rules:**
   1. `expiresAt` required, max 12h; expired alerts auto-transition to `EXPIRED`, never deleted.
   2. EVACUATE requires 2-officer confirm (maker-checker). Second confirm logged in `VerificationRecord`-style audit.

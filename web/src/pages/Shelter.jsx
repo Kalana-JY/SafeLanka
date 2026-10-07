@@ -8,7 +8,7 @@ function err(e) {
 }
 
 export default function ShelterOps() {
-  const { user, signout } = useAuth();
+  const { user } = useAuth();
   const { t } = useI18n();
   const [list, setList] = useState([]);
   const [id, setId] = useState('');
@@ -79,7 +79,6 @@ export default function ShelterOps() {
         <h1>{t('shelters')}</h1>
         <span className="badge">{user?.role}</span>
         <LangSwitcher />
-        <button onClick={signout}>{t('signOut')}</button>
       </header>
       <select value={id} onChange={(e) => setId(e.target.value)}>
         {list.map((s) => (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useI18n, LangSwitcher } from '../context/I18nContext';
+import ReportMap from '../components/ReportMap';
 
 const TABS = ['Verify', 'Alerts', 'Users'];
 const LEVELS = ['WATCH', 'WARNING', 'EVACUATE', 'ALL_CLEAR'];
@@ -138,6 +139,8 @@ function VerifyTab() {
               Reporter: {r.reporterId?.fullName} <span className="amber-tag">{r.reporterId?.role}</span>
             </div>
             <p>{r.description}</p>
+            <h4>Location (OpenStreetMap — free)</h4>
+            <ReportMap lat={r.lat} lng={r.lng} refLabel={`${r.ref} · ${r.hazardType}`} />
             {sel.evidence.map((ev) => (
               <div key={ev._id}>
                 {ev.mediaType === 'PHOTO' && ev.data ? (
@@ -231,7 +234,7 @@ function AlertsTab() {
   const [events, setEvents] = useState([]);
   const [areas, setAreas] = useState([]);
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ eventId: '', targetAreaId: '', level: 'WARNING', en: '', si: '', ta: '', enBody: '', siBody: '', taBody: '', hours: 2, secondBy: '' });
+  const [f, setF] = useState({ eventId: '', targetAreaId: '', level: 'WARNING', en: '', enBody: '', hours: 2, secondBy: '' });
   const [reach, setReach] = useState(null);
   const [created, setCreated] = useState(null);
 
@@ -272,8 +275,8 @@ function AlertsTab() {
         eventId: f.eventId,
         targetAreaId: f.targetAreaId,
         level: f.level,
-        headline: { en: f.en, si: f.si, ta: f.ta },
-        body: { en: f.enBody, si: f.siBody, ta: f.taBody },
+        headline: f.en,
+        body: f.enBody,
         expiresAt: exp
       });
       setMsg(`Draft created — reach ${data.reach}`);
@@ -310,9 +313,8 @@ function AlertsTab() {
 
   const curEvent = events.find((e) => e._id === f.eventId);
   const complete =
-    f.eventId && f.targetAreaId && f.en.trim() && f.si.trim() && f.ta.trim() &&
-    f.enBody.trim() && f.siBody.trim() && f.taBody.trim();
-  const blockReason = !complete ? 'Headline + body required in EN, SI and TA' : '';
+    f.eventId && f.targetAreaId && f.en.trim() && f.enBody.trim();
+  const blockReason = !complete ? 'Headline + body required' : '';
   const sms = (s) => s.length;
   const target = created || null;
 
@@ -368,16 +370,14 @@ function AlertsTab() {
           )}
         </div>
         <div>
-          <h4>Message (3 languages required)</h4>
-          {[['en', 'EN'], ['si', 'SI'], ['ta', 'TA']].map(([k, label]) => (
-            <div key={k} className="form">
-              <input placeholder={`Headline ${label}`} value={f[k]} onChange={set(k)} />
-              <input placeholder={`Body ${label}`} value={f[k + 'Body']} onChange={set(k + 'Body')} />
-              <span className={`smscount ${(f[k + 'Body'] || '').length > 160 ? 'over' : ''}`}>
-                SMS {sms(f[k + 'Body'] || '')}/160
-              </span>
-            </div>
-          ))}
+          <h4>Message</h4>
+          <div className="form">
+            <input placeholder="Headline" value={f.en} onChange={set('en')} />
+            <input placeholder="Body" value={f.enBody} onChange={set('enBody')} />
+            <span className={`smscount ${(f.enBody || '').length > 160 ? 'over' : ''}`}>
+              SMS {sms(f.enBody || '')}/160
+            </span>
+          </div>
         </div>
       </div>
       <div className="commitbar">
@@ -481,7 +481,7 @@ function UsersTab() {
 
 export default function Dmc() {
   const [tab, setTab] = useState('Verify');
-  const { user, signout } = useAuth();
+  const { user } = useAuth();
   const { t } = useI18n();
   return (
     <div className="container wide">
@@ -490,7 +490,6 @@ export default function Dmc() {
         <span className="badge">{user?.role}</span>
         <span>{user?.fullName}</span>
         <LangSwitcher />
-        <button onClick={signout}>{t('signOut')}</button>
       </header>
       <nav className="tabs">
         {TABS.map((tb) => (

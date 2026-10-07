@@ -1,8 +1,9 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// Emulator default. Physical device: replace with PC LAN IP, e.g. http://192.168.1.5:5000/api
-export const API_BASE = 'http://10.0.2.2:5000/api';
+// Physical phone (Expo Go) cannot reach 10.0.2.2 (emulator-only).
+// Uses PC LAN IP by default; override with EXPO_PUBLIC_API_URL for emulator/other networks.
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.8.100:5000/api';
 
 export const api = axios.create({ baseURL: API_BASE, timeout: 15000 });
 
