@@ -1,0 +1,16 @@
+{
+  "appName": "SafeLanka — Staff Console",
+  "signIn": "Sign in",
+  "signOut": "Sign out",
+  "email": "Email",
+  "password": "Password",
+  "alerts": "Alerts",
+  "verify": "Verify",
+  "users": "Users",
+  "shelters": "Shelters",
+  "dispatch": "Dispatch",
+  "refresh": "Refresh",
+  "back": "Back",
+  "loading": "Loading…",
+  "dashboard": "Dashboard"
+}

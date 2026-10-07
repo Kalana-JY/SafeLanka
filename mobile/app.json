@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "SafeLanka",
+    "slug": "safelanka",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.safelanka.app"
+    }
+  }
+}

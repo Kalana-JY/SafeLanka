@@ -1,0 +1,96 @@
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --bg: #edf1f7;
+  --surface: #ffffff;
+  --surface-soft: #f7f9fc;
+  --ink: #1c2733;
+  --muted: #5b6b7c;
+  --brand: #0e3a5d;
+  --brand-deep: #0a2a44;
+  --accent: #f9a825;
+  --line: #dde4ee;
+}
+body { margin: 0; background: var(--bg); color: var(--ink); }
+.container { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.container.wide { max-width: 1000px; }
+.container.narrow { max-width: 420px; }
+/* Branded identity bar — every staff page is recognizable at a glance. */
+.header {
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+  color: #fff; padding: 14px 18px; border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(10, 42, 68, 0.25); margin-bottom: 16px;
+}
+.header h1 { font-size: 19px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.header h1::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.header button, .header select { margin-left: auto; }
+.header button + button, .header select + button { margin-left: 0; }
+.header .badge { background: rgba(255, 255, 255, 0.18); color: #fff; }
+.footer {
+  margin-top: 0; padding: 26px 18px; text-align: center;
+  background: var(--brand-deep); color: #c9d6e3; font-size: 13px; width: 100%;
+}
+.footer b { color: #fff; }
+.footer .foot-row { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
+/* App frame: navbar on top, footer pinned to the viewport bottom. */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.main { flex: 1; width: 100%; }
+.navbar {
+  display: flex; align-items: center; gap: 16px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  padding: 10px 18px; position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--brand); text-decoration: none; font-size: 17px; }
+.brand-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.nav-links { display: flex; gap: 12px; }
+.nav-links a { color: var(--ink); text-decoration: none; }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.card, .alert-card, table, .form {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(28, 39, 51, 0.08);
+}
+table { border-collapse: collapse; width: 100%; margin: 12px 0; overflow: hidden; }
+th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; font-size: 14px; }
+th { background: var(--surface-soft); color: var(--muted); font-weight: 600; }
+.alert-card { padding: 14px; margin: 12px 0; }
+.form { padding: 14px; display: flex; flex-direction: column; gap: 10px; max-width: 480px; }
+.form input, .form select { padding: 10px; border: 1px solid #c3cede; border-radius: 6px; background: #fff; width: 100%; box-sizing: border-box; }
+button { padding: 7px 14px; cursor: pointer; border-radius: 6px; border: 1px solid #c3cede; background: #fff; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button:not(:disabled):hover { border-color: var(--brand); }
+.tabs button:disabled { background: var(--brand); color: #fff; border-color: var(--brand); }
+.tabs { display: flex; gap: 8px; margin: 12px 0; }
+.row { display: flex; gap: 4px; }
+/* SafeLanka wireframe language (Report Fig 4.4–4.6): consequence before
+   commitment; amber = judgment call; red = blocking condition only. */
+.ladder { display: flex; gap: 6px; margin: 8px 0; }
+.ladder-step { flex: 1; padding: 8px 4px; border: 2px solid #ccc; border-radius: 6px; background: #fff; font-size: 12px; cursor: pointer; }
+.ladder-step.current { border-style: dashed; }
+.ladder-step.proposed { border-color: #333; background: #eee; font-weight: bold; }
+.sev-WATCH { border-left: 6px solid #1976d2; }
+.sev-WARNING { border-left: 6px solid #f9a825; }
+.sev-EVACUATE { border-left: 6px solid #c62828; }
+.sev-ALL_CLEAR { border-left: 6px solid #2e7d32; }
+.reach { font-size: 20px; font-weight: bold; }
+.smscount { font-size: 12px; color: #666; }
+.smscount.over { color: #c62828; font-weight: bold; }
+.commitbar { display: flex; gap: 10px; align-items: center; border-top: 2px solid #333; padding: 12px 0; margin-top: 12px; }
+.composer-grid { display: grid; grid-template-columns: 220px 1fr 1fr; gap: 16px; }
+.rail { border-right: 1px solid #ddd; padding-right: 12px; }
+.rail-item { display: block; width: 100%; text-align: left; margin-bottom: 6px; }
+.rail-item.active { font-weight: bold; background: #eee; }
+.alert-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 10px 0; }
+.channelbar { height: 10px; background: #eee; border-radius: 5px; margin: 4px 0; overflow: hidden; }
+.channelbar > div { height: 100%; background: #2e7d32; }
+.banner-fail { background: #fdecea; border: 1px solid #c62828; border-radius: 6px; padding: 10px; margin: 8px 0; }
+.coverage { font-weight: bold; margin-top: 8px; }
+.amber-tag { background: #fff3cd; border: 1px solid #f9a825; border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+/* Shelter gauge (Report Fig 4.22–4.23): live number, never a stale count. */
+.gauge { height: 14px; background: #eee; border-radius: 7px; overflow: hidden; margin: 4px 0; min-width: 120px; }
+.gauge > div { height: 100%; background: #2e7d32; }
+.gauge.warn > div { background: #f9a825; }
+.gauge.full > div { background: #c62828; }
+.alarm { background: #fff3cd; border: 2px solid #f9a825; border-radius: 6px; padding: 10px; margin: 8px 0; font-weight: bold; }
+.tag-needs { background: #e3f2fd; border: 1px solid #1976d2; border-radius: 4px; padding: 1px 6px; font-size: 12px; }

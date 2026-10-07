@@ -1,0 +1,23 @@
+{
+  "name": "safelanka-mobile",
+  "version": "1.0.0",
+  "main": "App.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "axios": "^1.20.0",
+    "expo": "~57.0.27",
+    "expo-image-picker": "~57.0.20",
+    "expo-location": "~57.0.20",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "private": true
+}
