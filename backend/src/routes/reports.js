@@ -24,8 +24,7 @@ const submitSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   mediaType: z.enum(MEDIA_TYPES).default('PHOTO'),
-  // ~500KB cap for the v1 inline JSON payload. Multipart upload arrives later.
-  evidenceBase64: z.string().max(700000).optional(),
+  evidenceBase64: z.string().max(50000000).optional(),
   clientUUID: z.string().min(1).max(64)
 });
 
@@ -111,6 +110,44 @@ router.get('/reports/mine', requireRole(...CITIZEN_ROLES), async (req, res, next
   }
 });
 
+// GET /api/reports/notifications — status updates and progress alerts for reporter
+router.get('/reports/notifications', requireRole(...CITIZEN_ROLES), async (req, res, next) => {
+  try {
+    const reports = await GroundReport.find({ reporterId: req.user._id }).sort({ updatedAt: -1, createdAt: -1 });
+    const notifications = reports.map((r) => {
+      let type = 'UNDER_REVIEW';
+      let title = 'Report Under Review';
+      let message = `Your ${r.hazardType} report (${r.ref}) has been submitted and is in the DMC Duty Officer queue.`;
+
+      if (r.status === 'VERIFIED') {
+        type = 'ACCEPTED';
+        title = 'Report Accepted';
+        message = `Good news! Your ${r.hazardType} report (${r.ref}) has been verified by the DMC Duty Officer and published to Community Reports.`;
+      } else if (r.status === 'REJECTED') {
+        type = 'REJECTED';
+        title = 'Report Unverified';
+        message = `Your ${r.hazardType} report (${r.ref}) was reviewed by the DMC Duty Officer and could not be verified.`;
+      }
+
+      return {
+        id: `${r._id}-${r.status}`,
+        reportId: r._id,
+        ref: r.ref,
+        hazardType: r.hazardType,
+        status: r.status,
+        type,
+        title,
+        message,
+        timestamp: r.updatedAt || r.createdAt
+      };
+    });
+
+    res.json({ notifications });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/reports/queue — ordered severity×credibility×age + SLA flag (UC-03).
 const SEVERITY_W = { TSUNAMI: 4, FLOOD: 3, LANDSLIDE: 3, CYCLONE: 2, OTHER: 1 };
 const SLA_MIN = 15;
@@ -132,6 +169,52 @@ router.get('/reports/queue', requireRole('DMC_OFFICER'), async (req, res, next) 
     next(err);
   }
 });
+
+// GET /api/reports/community — all reports accepted/verified by DMC duty officers
+router.get('/reports/community', async (req, res, next) => {
+  try {
+    const reports = await GroundReport.find({ status: 'VERIFIED' })
+      .populate('reporterId', 'fullName district')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(100);
+    const withEvidence = await Promise.all(
+      reports.map(async (r) => ({
+        report: r,
+        evidence: await evidenceFor(r._id)
+      }))
+    );
+    res.json({ reports: withEvidence });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/reports/:id/evidence — add evidence (photos, voice) to an existing report
+router.post(
+  '/reports/:id/evidence',
+  validate(
+    z.object({
+      mediaType: z.enum(MEDIA_TYPES).default('PHOTO'),
+      evidenceBase64: z.string().max(50000000)
+    })
+  ),
+  async (req, res, next) => {
+    try {
+      const report = await GroundReport.findById(req.params.id);
+      if (!report) return res.status(404).json({ error: 'Report not found' });
+      const { mediaType, evidenceBase64 } = req.body;
+      const doc = await Evidence.create({
+        reportId: report._id,
+        mediaType,
+        data: evidenceBase64,
+        sizeKb: Math.round(Buffer.byteLength(evidenceBase64, 'utf8') / 1024)
+      });
+      res.status(201).json({ evidence: doc.toJSON() });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // GET /api/reports/:id — owner or DMC. Includes evidence payload for review.
 router.get('/reports/:id', async (req, res, next) => {
