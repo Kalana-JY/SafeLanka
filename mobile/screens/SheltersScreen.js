@@ -87,7 +87,17 @@ export default function SheltersScreen({ user, onNavigate, onOpenNotifications, 
     <View style={styles.container}>
       {/* Top Header with Centered Emergency Shelters Title & Bell on Right */}
       <View style={styles.header}>
-        <View style={styles.headerLeftSpacer} />
+        {onNavigate ? (
+          <TouchableOpacity
+            style={styles.backBtn}
+            activeOpacity={0.7}
+            onPress={() => onNavigate('Home')}
+          >
+            <FontAwesome5 name="chevron-left" size={18} color="#1e293b" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerLeftSpacer} />
+        )}
         <Text style={styles.headerTitle}>Emergency Shelters</Text>
         <TouchableOpacity
           style={styles.bellBtn}
@@ -370,6 +380,12 @@ const styles = StyleSheet.create({
   },
   headerLeftSpacer: {
     width: 32
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'flex-start'
   },
   headerTitle: {
     fontFamily: 'Montserrat_700Bold',

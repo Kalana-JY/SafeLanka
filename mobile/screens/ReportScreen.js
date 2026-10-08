@@ -61,6 +61,7 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
   const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
   const [confirmedReport, setConfirmedReport] = useState(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const handleReturnHome = () => {
     setConfirmedReport(null);
@@ -242,7 +243,7 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
     setEvidenceType('PHOTO');
   };
 
-  const handleSubmit = async () => {
+  const handleOpenReview = () => {
     if (!hazardType) {
       setStatusMessage({ text: 'Please select a hazard type.', type: 'error' });
       return;
@@ -253,6 +254,26 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
     }
     if (!lat || !lng || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
       setStatusMessage({ text: 'Please specify or select a valid location on the map.', type: 'error' });
+      return;
+    }
+    setStatusMessage({ text: '', type: '' });
+    setReviewOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!hazardType) {
+      setStatusMessage({ text: 'Please select a hazard type.', type: 'error' });
+      setReviewOpen(false);
+      return;
+    }
+    if (!description.trim()) {
+      setStatusMessage({ text: 'Please provide hazard description details.', type: 'error' });
+      setReviewOpen(false);
+      return;
+    }
+    if (!lat || !lng || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+      setStatusMessage({ text: 'Please specify or select a valid location on the map.', type: 'error' });
+      setReviewOpen(false);
       return;
     }
 
@@ -280,6 +301,7 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
       const rawRef = data?.report?.ref || 'XYZ789012';
       const displayRef = rawRef.startsWith('#') ? rawRef : `#${rawRef}`;
 
+      setReviewOpen(false);
       setConfirmedReport({
         hazardLabel: selectedHazardObj?.label || hazardType,
         locationName: locationName || (lat && lng ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : 'Main Street, City'),
@@ -300,6 +322,7 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
         const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
         const displayRef = `#OFFLINE-${draft.clientUUID.slice(0, 6).toUpperCase()}`;
 
+        setReviewOpen(false);
         setConfirmedReport({
           hazardLabel: selectedHazardObj?.label || hazardType,
           locationName: locationName || (lat && lng ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : 'Current Location'),
@@ -403,7 +426,17 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
     <View style={styles.container}>
       {/* Top Header with Centered Title & Bell on Right */}
       <View style={styles.header}>
-        <View style={styles.headerLeftSpacer} />
+        {onNavigate ? (
+          <TouchableOpacity
+            style={styles.backBtn}
+            activeOpacity={0.7}
+            onPress={() => onNavigate('Home')}
+          >
+            <FontAwesome5 name="chevron-left" size={18} color="#1e293b" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerLeftSpacer} />
+        )}
         <Text style={styles.headerTitle}>Report Hazard Form</Text>
         <TouchableOpacity
           style={styles.bellBtn}
@@ -679,23 +712,154 @@ export default function ReportScreen({ onSubmitted, onNavigate, onOpenNotificati
           )}
         </View>
 
-        {/* Submit Hazard Report Button */}
+        {/* Review & Submit Hazard Report Button */}
         <TouchableOpacity
-          style={[styles.submitButton, busy && styles.submitButtonDisabled]}
+          style={styles.submitButton}
           activeOpacity={0.85}
-          disabled={busy}
-          onPress={handleSubmit}
+          onPress={handleOpenReview}
         >
-          {busy ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <>
-              <FontAwesome5 name="paper-plane" size={16} color="#ffffff" solid style={{ marginRight: 8 }} />
-              <Text style={styles.submitButtonText}>Submit Hazard Report</Text>
-            </>
-          )}
+          <FontAwesome5 name="clipboard-check" size={16} color="#ffffff" solid style={{ marginRight: 8 }} />
+          <Text style={styles.submitButtonText}>Review & Submit Report</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Citizen Review Details Modal */}
+      <Modal
+        visible={reviewOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !busy && setReviewOpen(false)}
+      >
+        <View style={styles.reviewModalOverlay}>
+          <View style={styles.reviewModalCard}>
+            {/* Modal Header */}
+            <View style={styles.reviewModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reviewModalTitle}>Review Report Details</Text>
+                <Text style={styles.reviewModalSubtitle}>Please verify all information before submission</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.reviewCloseBtn}
+                onPress={() => !busy && setReviewOpen(false)}
+                disabled={busy}
+              >
+                <FontAwesome5 name="times" size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.reviewScroll}
+              contentContainerStyle={styles.reviewScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Hazard Category Card */}
+              <View style={styles.reviewItemCard}>
+                <Text style={styles.reviewItemLabel}>HAZARD TYPE</Text>
+                <View style={styles.reviewHazardRow}>
+                  <View style={styles.reviewHazardIconWrap}>
+                    <FontAwesome5
+                      name={selectedHazardObj?.icon || 'exclamation-triangle'}
+                      size={16}
+                      color="#2563eb"
+                      solid
+                    />
+                  </View>
+                  <Text style={styles.reviewHazardName}>{selectedHazardObj?.label || hazardType}</Text>
+                </View>
+              </View>
+
+              {/* Location Card */}
+              <View style={styles.reviewItemCard}>
+                <Text style={styles.reviewItemLabel}>INCIDENT LOCATION</Text>
+                <Text style={styles.reviewLocationName}>{locationName || 'Location not named'}</Text>
+                <View style={styles.reviewCoordRow}>
+                  <FontAwesome5 name="map-marker-alt" size={12} color="#64748b" style={{ marginRight: 6 }} />
+                  <Text style={styles.reviewCoordText}>
+                    {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+                    {accuracy ? ` (±${accuracy}m GPS accuracy)` : ''}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description Card */}
+              <View style={styles.reviewItemCard}>
+                <Text style={styles.reviewItemLabel}>HAZARD DESCRIPTION</Text>
+                <View style={styles.reviewDescBox}>
+                  <Text style={styles.reviewDescText}>{description.trim()}</Text>
+                </View>
+              </View>
+
+              {/* Attached Evidence Card */}
+              <View style={styles.reviewItemCard}>
+                <Text style={styles.reviewItemLabel}>ATTACHED EVIDENCE</Text>
+                {photoUri ? (
+                  <View style={styles.reviewEvidenceWrap}>
+                    <Image source={{ uri: photoUri }} style={styles.reviewPhotoThumbnail} resizeMode="cover" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.reviewEvidenceTitle}>Photo Evidence</Text>
+                      <Text style={styles.reviewEvidenceSubtitle}>Image captured & attached</Text>
+                    </View>
+                    <FontAwesome5 name="check-circle" size={18} color="#16a34a" solid />
+                  </View>
+                ) : voiceUri ? (
+                  <View style={styles.reviewEvidenceWrap}>
+                    <View style={styles.reviewVoiceIcon}>
+                      <FontAwesome5 name="microphone" size={16} color="#2563eb" solid />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.reviewEvidenceTitle}>Voice Recording</Text>
+                      <Text style={styles.reviewEvidenceSubtitle}>Audio note attached</Text>
+                    </View>
+                    <FontAwesome5 name="check-circle" size={18} color="#16a34a" solid />
+                  </View>
+                ) : (
+                  <View style={styles.reviewNoEvidence}>
+                    <FontAwesome5 name="info-circle" size={14} color="#94a3b8" style={{ marginRight: 8 }} />
+                    <Text style={styles.reviewNoEvidenceText}>No media attached (Text & Location only)</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* DMC Workflow Notice */}
+              <View style={styles.reviewNoticeBox}>
+                <FontAwesome5 name="shield-alt" size={14} color="#2563eb" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={styles.reviewNoticeText}>
+                  Your report will be sent directly to the Disaster Management Centre (DMC) Duty Officer queue for verification and emergency response coordination.
+                </Text>
+              </View>
+            </ScrollView>
+
+            {/* Modal Actions */}
+            <View style={styles.reviewModalActions}>
+              <TouchableOpacity
+                style={styles.reviewEditBtn}
+                activeOpacity={0.8}
+                disabled={busy}
+                onPress={() => setReviewOpen(false)}
+              >
+                <FontAwesome5 name="edit" size={14} color="#475569" style={{ marginRight: 6 }} />
+                <Text style={styles.reviewEditBtnText}>Edit Details</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.reviewConfirmBtn, busy && styles.submitButtonDisabled]}
+                activeOpacity={0.85}
+                disabled={busy}
+                onPress={handleSubmit}
+              >
+                {busy ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <FontAwesome5 name="paper-plane" size={14} color="#ffffff" solid style={{ marginRight: 6 }} />
+                    <Text style={styles.reviewConfirmBtnText}>Confirm & Submit</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Hazard Type Picker Modal */}
       <Modal
@@ -768,6 +932,12 @@ const styles = StyleSheet.create({
   },
   headerLeftSpacer: {
     width: 32
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'flex-start'
   },
   headerTitle: {
     fontFamily: 'Montserrat_700Bold',
@@ -1338,6 +1508,242 @@ const styles = StyleSheet.create({
   returnHomeBtnText: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize: 15,
+    color: '#ffffff',
+    fontWeight: Platform.OS === 'web' ? '600' : undefined
+  },
+
+  /* Citizen Review Modal Styles */
+  reviewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+    alignItems: 'center'
+  },
+  reviewModalCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '90%',
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 12 },
+      web: { boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.15)' }
+    })
+  },
+  reviewModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#ffffff'
+  },
+  reviewModalTitle: {
+    fontFamily: 'Montserrat_700Bold',
+    fontSize: 18,
+    color: '#0f172a',
+    fontWeight: Platform.OS === 'web' ? '700' : undefined
+  },
+  reviewModalSubtitle: {
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 12.5,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
+  reviewCloseBtn: {
+    padding: 8
+  },
+  reviewScroll: {
+    flexGrow: 1,
+    paddingHorizontal: 20
+  },
+  reviewScrollContent: {
+    paddingVertical: 16,
+    gap: 12
+  },
+  reviewItemCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  reviewItemLabel: {
+    fontFamily: 'Montserrat_700Bold',
+    fontSize: 11,
+    color: '#64748b',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    fontWeight: Platform.OS === 'web' ? '700' : undefined
+  },
+  reviewHazardRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  reviewHazardIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  reviewHazardName: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 15,
+    color: '#1e293b',
+    fontWeight: Platform.OS === 'web' ? '600' : undefined
+  },
+  reviewLocationName: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 14.5,
+    color: '#1e293b',
+    marginBottom: 4,
+    fontWeight: Platform.OS === 'web' ? '600' : undefined
+  },
+  reviewCoordRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  reviewCoordText: {
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 12.5,
+    color: '#64748b',
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
+  reviewDescBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3b82f6'
+  },
+  reviewDescText: {
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 13.5,
+    color: '#334155',
+    lineHeight: 20,
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
+  reviewEvidenceWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  reviewPhotoThumbnail: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: '#e2e8f0'
+  },
+  reviewVoiceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  reviewEvidenceTitle: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 13.5,
+    color: '#1e293b',
+    fontWeight: Platform.OS === 'web' ? '600' : undefined
+  },
+  reviewEvidenceSubtitle: {
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
+  reviewNoEvidence: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4
+  },
+  reviewNoEvidenceText: {
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 13,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
+  reviewNoticeBox: {
+    flexDirection: 'row',
+    backgroundColor: '#eff6ff',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginTop: 4
+  },
+  reviewNoticeText: {
+    flex: 1,
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 12,
+    color: '#1e40af',
+    lineHeight: 17,
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
+  reviewModalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
+    gap: 12
+  },
+  reviewEditBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  reviewEditBtnText: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 14,
+    color: '#475569',
+    fontWeight: Platform.OS === 'web' ? '600' : undefined
+  },
+  reviewConfirmBtn: {
+    flex: 1.3,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: '#2563eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#2563eb', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+      android: { elevation: 3 },
+      web: { boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)', cursor: 'pointer' }
+    })
+  },
+  reviewConfirmBtnText: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 14,
     color: '#ffffff',
     fontWeight: Platform.OS === 'web' ? '600' : undefined
   }

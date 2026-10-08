@@ -16,14 +16,16 @@ const DEFAULT_ALERTS = [
   {
     id: 'def-1',
     title: 'Emergency Alert: Flash Flood Warning',
-    body: 'Issued for downtown area. Seek higher ground immediately.',
+    body: 'Issued by DMC Duty Officer for downtown area. Seek higher ground immediately.',
+    issuer: 'DMC Duty Officer',
     level: 'EVACUATE',
     time: 'Just now'
   },
   {
     id: 'def-2',
     title: 'Advisory: Road Closure',
-    body: 'Main Street closed due to fallen tree. Use alternate routes.',
+    body: 'Issued by DMC Duty Officer. Main Street closed due to fallen tree. Use alternate routes.',
+    issuer: 'DMC Duty Officer',
     level: 'WARNING',
     time: '25m ago'
   }
@@ -40,7 +42,13 @@ export default function HomeScreen({ user, onNavigate, onOpenNotifications, hasU
       const district = user?.district ? `?district=${encodeURIComponent(user.district)}` : '';
       const { data } = await api.get(`/alerts/active${district}`);
       if (data?.alerts && data.alerts.length > 0) {
-        setAlerts(data.alerts);
+        // Filter alerts issued by DMC Duty Officer / published by DMC
+        const dmcAlerts = data.alerts.filter((a) => {
+          if (a.issuerRole && a.issuerRole !== 'DMC_OFFICER') return false;
+          if (a.role && a.role !== 'DMC_OFFICER') return false;
+          return true;
+        });
+        setAlerts(dmcAlerts.length > 0 ? dmcAlerts : data.alerts);
       } else {
         setAlerts(DEFAULT_ALERTS);
       }
@@ -97,42 +105,13 @@ export default function HomeScreen({ user, onNavigate, onOpenNotifications, hasU
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" />}
       >
-        {/* Real-time Alerts / Notifications Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Real-time Alerts/Notifications</Text>
+        {/* Citizen Greeting Section */}
+        <View style={styles.greetingSection}>
+          <Text style={styles.greetingTitle}>
+            {user?.fullName ? `Hello, ${user.fullName.split(' ')[0]}` : 'Hello, Citizen'}
+          </Text>
+          <Text style={styles.greetingSubtitle}>Stay safe and alert today</Text>
         </View>
-
-        {loading ? (
-          <View style={styles.loaderBox}>
-            <ActivityIndicator size="small" color="#2563eb" />
-          </View>
-        ) : (
-          <View style={styles.alertsList}>
-            {alerts.slice(0, 3).map((item, idx) => {
-              const headline = getAlertHeadline(item);
-              const body = getAlertBody(item);
-              const itemId = item._id || item.id || `alert-${idx}`;
-              const isExpanded = expandedId === itemId;
-
-              return (
-                <TouchableOpacity
-                  key={itemId}
-                  style={styles.alertCard}
-                  activeOpacity={0.85}
-                  onPress={() => setExpandedId(isExpanded ? null : itemId)}
-                >
-                  <Text style={styles.alertTitle}>{headline}</Text>
-                  {!!body && <Text style={styles.alertBody}>{body}</Text>}
-                  {isExpanded && item.expiresAt && (
-                    <Text style={styles.alertMeta}>
-                      Valid until: {new Date(item.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
 
         {/* 2x2 Grid of Quick Actions with FontAwesome Chisel Icons */}
         <View style={styles.gridContainer}>
@@ -182,6 +161,49 @@ export default function HomeScreen({ user, onNavigate, onOpenNotifications, hasU
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Real-time Alerts / Notifications Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Latest Alerts</Text>
+        </View>
+
+        {loading ? (
+          <View style={styles.loaderBox}>
+            <ActivityIndicator size="small" color="#2563eb" />
+          </View>
+        ) : (
+          <View style={styles.alertsList}>
+            {alerts.slice(0, 2).map((item, idx) => {
+              const headline = getAlertHeadline(item);
+              const body = getAlertBody(item);
+              const itemId = item._id || item.id || `alert-${idx}`;
+              const isExpanded = expandedId === itemId;
+
+              return (
+                <TouchableOpacity
+                  key={itemId}
+                  style={styles.alertCard}
+                  activeOpacity={0.85}
+                  onPress={() => setExpandedId(isExpanded ? null : itemId)}
+                >
+                  <View style={styles.alertHeaderRow}>
+                    <Text style={styles.alertTitle}>{headline}</Text>
+                    <View style={styles.dmcBadge}>
+                      <FontAwesome5 name="shield-alt" size={9} color="#2563eb" style={{ marginRight: 4 }} />
+                      <Text style={styles.dmcBadgeText}>DMC Duty Officer</Text>
+                    </View>
+                  </View>
+                  {!!body && <Text style={styles.alertBody}>{body}</Text>}
+                  {isExpanded && item.expiresAt && (
+                    <Text style={styles.alertMeta}>
+                      Valid until: {new Date(item.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -276,12 +298,35 @@ const styles = StyleSheet.create({
       }
     })
   },
+  alertHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    gap: 8
+  },
   alertTitle: {
+    flex: 1,
     fontFamily: 'Montserrat_700Bold',
     fontSize: 14.5,
     color: '#0f172a',
-    marginBottom: 6,
     fontWeight: Platform.OS === 'web' ? '700' : undefined
+  },
+  dmcBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#dbeafe'
+  },
+  dmcBadgeText: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize: 10.5,
+    color: '#1d4ed8',
+    fontWeight: Platform.OS === 'web' ? '600' : undefined
   },
   alertBody: {
     fontFamily: 'Montserrat_400Regular',
@@ -297,9 +342,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: Platform.OS === 'web' ? '500' : undefined
   },
+  greetingSection: {
+    marginBottom: 20
+  },
+  greetingTitle: {
+    fontFamily: 'Montserrat_700Bold',
+    fontSize: 22,
+    color: '#0f172a',
+    letterSpacing: -0.3,
+    marginBottom: 2,
+    fontWeight: Platform.OS === 'web' ? '700' : undefined
+  },
+  greetingSubtitle: {
+    fontFamily: 'Montserrat_400Regular',
+    fontSize: 13.5,
+    color: '#64748b',
+    fontWeight: Platform.OS === 'web' ? '400' : undefined
+  },
   gridContainer: {
     gap: 14,
-    marginTop: 4
+    marginBottom: 36
   },
   gridRow: {
     flexDirection: 'row',
