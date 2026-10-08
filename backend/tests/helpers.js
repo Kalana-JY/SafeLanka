@@ -72,7 +72,7 @@ export async function createUser(overrides = {}) {
     passwordHash: 'test-hash-not-a-login',
     role,
     district: overrides.district || 'Ratnapura',
-    preferredLanguage: 'en',
+    preferredLanguage: overrides.preferredLanguage || 'en',
     alertOptIn: overrides.alertOptIn !== undefined ? overrides.alertOptIn : true,
     active: overrides.active !== false
   };
