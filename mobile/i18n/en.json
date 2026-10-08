@@ -1,8 +1,11 @@
 {
+  "home": "Home",
   "alerts": "Alerts",
   "report": "Report",
+  "reports": "Reports",
   "shelters": "Shelters",
-  "myReports": "My Reports",
+  "resources": "Resources",
+  "myReports": "Reports",
   "profile": "Profile",
   "signIn": "Sign in",
   "signUp": "Sign up",
