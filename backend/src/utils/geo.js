@@ -1,24 +1,72 @@
 import User from '../models/User.js';
+import { ALERT_LANGUAGES } from '../models/Alert.js';
 
-// v1 recipient resolution: registered, active, opted-in citizens of the district.
-// Polygon-level resolution against the National GIS Map Service arrives later;
-// district match is the documented simplification (see TargetArea model).
-export async function resolveRecipients(district) {
-  return User.find({
-    district,
-    active: true,
-    alertOptIn: true,
-    role: { $in: ['CITIZEN', 'VOLUNTEER'] }
-  }).select('_id');
+const RECIPIENT_ROLES = ['CITIZEN', 'VOLUNTEER'];
+
+function asDistrictList(districts) {
+  const raw = Array.isArray(districts) ? districts : districts ? [districts] : [];
+  const out = [];
+  const seen = new Set();
+  for (const value of raw) {
+    const name = String(value ?? '').trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
 }
 
-export async function countRecipients(district) {
-  return User.countDocuments({
-    district,
+function languageOf(preferredLanguage) {
+  return ALERT_LANGUAGES.includes(preferredLanguage) ? preferredLanguage : 'en';
+}
+
+// Eligible recipients: active, opted-in citizens and volunteers in the given districts.
+export async function resolveRecipients(districts) {
+  const list = asDistrictList(districts);
+  if (!list.length) return [];
+  return User.find({
+    district: { $in: list },
     active: true,
     alertOptIn: true,
-    role: { $in: ['CITIZEN', 'VOLUNTEER'] }
-  });
+    role: { $in: RECIPIENT_ROLES }
+  }).select('_id preferredLanguage district');
+}
+
+// One read of recipient-role users in the area, then counts derived in memory.
+// `excluded` is active citizens/volunteers inside the area who opted out.
+// Inactive users and people outside the area are not included in `excluded`.
+export async function summarizeReach(districts) {
+  const list = asDistrictList(districts);
+  const languages = { en: 0, si: 0, ta: 0 };
+  if (!list.length) {
+    return { reach: 0, excluded: 0, districts: [], languages };
+  }
+
+  const users = await User.find({
+    district: { $in: list },
+    role: { $in: RECIPIENT_ROLES }
+  })
+    .select('district preferredLanguage alertOptIn active')
+    .lean();
+
+  const eligible = users.filter((user) => user.active && user.alertOptIn);
+  const excluded = users.filter((user) => user.active && user.alertOptIn === false).length;
+  for (const user of eligible) languages[languageOf(user.preferredLanguage)] += 1;
+
+  return {
+    reach: eligible.length,
+    excluded,
+    districts: list.map((district) => ({
+      district,
+      eligible: eligible.filter((user) => user.district === district).length
+    })),
+    languages
+  };
+}
+
+export async function countRecipients(districts) {
+  const summary = await summarizeReach(districts);
+  return summary.reach;
 }
 
 // Haversine distance in metres. Used for dedupe radius + sensor proximity.
