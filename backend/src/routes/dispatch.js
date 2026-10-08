@@ -20,6 +20,17 @@ function generateOrderRef() {
   return 'DO-' + Math.floor(1000 + Math.random() * 9000);
 }
 
+// Only revert a resource this request changed, and only while it still has
+// the status this request wrote. A later operation that moved it is left alone.
+async function restoreResourceStatus(ids, fromStatus, toStatus) {
+  for (const id of ids) {
+    await Resource.updateOne(
+      { _id: id, status: fromStatus },
+      { $set: { status: toStatus } }
+    );
+  }
+}
+
 // Distribute is atomic: EN_ROUTE -> ON_SITE (arrival, device-stamped) ->
 // FULFILLED in one transaction. ON_SITE persists on the distribution record
 // and audit trail rather than as a lingering order state.
@@ -149,6 +160,8 @@ router.get('/dispatch/:id', async (req, res, next) => {
 
 // Reserve: AVAILABLE items lock; the rest become partner-request stubs (split fulfilment).
 router.post('/dispatch/:id/reserve', requireRole(...DISTRICT), async (req, res, next) => {
+  const claimedIds = [];
+  let persisted = false;
   try {
     const order = await DispatchOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Dispatch order not found' });
@@ -161,12 +174,15 @@ router.post('/dispatch/:id/reserve', requireRole(...DISTRICT), async (req, res, 
         item.partnerNote = 'No district resource specified — partner request stub';
         continue;
       }
-      const resource = await Resource.findById(item.resourceId);
-      if (resource && resource.status === 'AVAILABLE') {
-        resource.status = 'RESERVED';
-        await resource.save();
+      const claimed = await Resource.findOneAndUpdate(
+        { _id: item.resourceId, status: 'AVAILABLE' },
+        { $set: { status: 'RESERVED' } },
+        { returnDocument: 'after' }
+      );
+      if (claimed) {
         item.status = 'RESERVED';
         reserved += 1;
+        claimedIds.push(claimed._id);
       } else {
         item.status = 'PARTNER_REQUESTED';
         item.partnerNote = 'District resource unavailable — partner request stub';
@@ -174,18 +190,27 @@ router.post('/dispatch/:id/reserve', requireRole(...DISTRICT), async (req, res, 
     }
     if (reserved === 0) {
       await order.save();
+      persisted = true;
       return res.status(422).json({ error: 'Nothing available to reserve — all lines need partners', order });
     }
     order.fulfillment = order.items.some((i) => i.status === 'PARTNER_REQUESTED') ? 'PARTIAL' : 'FULL';
     order.status = 'RESERVED';
     order.reservationExpiresAt = new Date(Date.now() + RESERVE_HOLD_MS);
     await order.save();
+    persisted = true;
     recordAudit(req.user._id.toString(), 'DISPATCH_RESERVE', 'DispatchOrder', order._id.toString(), null, {
       reserved,
       fulfillment: order.fulfillment
     });
     res.json({ order });
   } catch (err) {
+    if (!persisted) {
+      try {
+        await restoreResourceStatus(claimedIds, 'RESERVED', 'AVAILABLE');
+      } catch (restoreErr) {
+        console.error(restoreErr);
+      }
+    }
     next(err);
   }
 });
@@ -195,6 +220,8 @@ router.post(
   requireRole(...DISTRICT),
   validate(z.object({ teamLeadId: z.string().min(1) })),
   async (req, res, next) => {
+    const deployedIds = [];
+    let persisted = false;
     try {
       const order = await DispatchOrder.findById(req.params.id);
       if (!order) return res.status(404).json({ error: 'Dispatch order not found' });
@@ -203,20 +230,35 @@ router.post(
       if (!lead || lead.role !== 'TEAM_LEADER' || !lead.active) {
         return res.status(422).json({ error: 'teamLeadId must be an active TEAM_LEADER' });
       }
+      // Deploy while the order is still RESERVED, then persist SENT. The
+      // timeout sweep only selects SENT orders, so it cannot revert the
+      // order and then lose a DEPLOYED write that happens afterwards.
+      for (const resourceId of order.items.map((item) => item.resourceId).filter(Boolean)) {
+        const deployed = await Resource.findOneAndUpdate(
+          { _id: resourceId, status: 'RESERVED' },
+          { $set: { status: 'DEPLOYED' } },
+          { returnDocument: 'after' }
+        );
+        if (deployed) deployedIds.push(deployed._id);
+      }
       order.teamLeadId = lead._id;
       order.status = 'SENT';
       order.notifiedAt = new Date();
       order.unacked = false;
       await order.save();
-      await Resource.updateMany(
-        { _id: { $in: order.items.map((i) => i.resourceId).filter(Boolean) }, status: 'RESERVED' },
-        { $set: { status: 'DEPLOYED' } }
-      );
+      persisted = true;
       recordAudit(req.user._id.toString(), 'DISPATCH_ASSIGN', 'DispatchOrder', order._id.toString(), null, {
         teamLeadId: lead._id.toString()
       });
       res.json({ order });
     } catch (err) {
+      if (!persisted) {
+        try {
+          await restoreResourceStatus(deployedIds, 'DEPLOYED', 'RESERVED');
+        } catch (restoreErr) {
+          console.error(restoreErr);
+        }
+      }
       next(err);
     }
   }
