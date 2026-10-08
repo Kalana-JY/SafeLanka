@@ -6,6 +6,32 @@ import ReportMap from '../components/ReportMap';
 
 const TABS = ['Verify', 'Alerts', 'Users'];
 const LEVELS = ['WATCH', 'WARNING', 'EVACUATE', 'ALL_CLEAR'];
+const MESSAGE_LANGS = [
+  { id: 'en', label: 'English', head: 'en', body: 'enBody' },
+  { id: 'si', label: 'Sinhala', head: 'si', body: 'siBody' },
+  { id: 'ta', label: 'Tamil', head: 'ta', body: 'taBody' }
+];
+
+function textOf(value, lang) {
+  if (typeof value === 'string') return lang === 'en' ? value : '';
+  return value?.[lang] || '';
+}
+
+function languageGaps(form) {
+  return MESSAGE_LANGS
+    .filter((lang) => !form[lang.head].trim() || !form[lang.body].trim())
+    .map((lang) => `${lang.label} headline and body are required.`);
+}
+
+function draftMatchesForm(alert, form) {
+  if (!alert) return false;
+  if (alert.level !== form.level) return false;
+  const areaId = typeof alert.targetAreaId === 'object' ? alert.targetAreaId?._id : alert.targetAreaId;
+  if (areaId && form.targetAreaId && String(areaId) !== String(form.targetAreaId)) return false;
+  return MESSAGE_LANGS.every(
+    (lang) => textOf(alert.headline, lang.id) === form[lang.head].trim() && textOf(alert.body, lang.id) === form[lang.body].trim()
+  );
+}
 
 function err(e) {
   return e?.response?.data?.error || 'Request failed';
@@ -234,7 +260,20 @@ function AlertsTab() {
   const [events, setEvents] = useState([]);
   const [areas, setAreas] = useState([]);
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ eventId: '', targetAreaId: '', level: 'WARNING', en: '', enBody: '', hours: 2, secondBy: '' });
+  const [f, setF] = useState({
+    eventId: '',
+    targetAreaId: '',
+    level: 'WARNING',
+    en: '',
+    enBody: '',
+    si: '',
+    siBody: '',
+    ta: '',
+    taBody: '',
+    hours: 2,
+    secondBy: ''
+  });
+  const [messageLang, setMessageLang] = useState('en');
   const [reach, setReach] = useState(null);
   const [created, setCreated] = useState(null);
 
@@ -275,8 +314,8 @@ function AlertsTab() {
         eventId: f.eventId,
         targetAreaId: f.targetAreaId,
         level: f.level,
-        headline: f.en,
-        body: f.enBody,
+        headline: { en: f.en.trim(), si: f.si.trim(), ta: f.ta.trim() },
+        body: { en: f.enBody.trim(), si: f.siBody.trim(), ta: f.taBody.trim() },
         expiresAt: exp
       });
       setMsg(`Draft created — reach ${data.reach}`);
@@ -303,7 +342,7 @@ function AlertsTab() {
     try {
       const exp = new Date(Date.now() + 3600 * 1000).toISOString();
       const { data } = await api.post(`/alerts/${id}/reissue`, { expiresAt: exp });
-      setCreated(data.alert);
+      loadIntoComposer(data.alert);
       setMsg(`Reissued as v${data.alert.version} draft — review, then Publish below.`);
       load();
     } catch (e) {
@@ -312,11 +351,30 @@ function AlertsTab() {
   }
 
   const curEvent = events.find((e) => e._id === f.eventId);
-  const complete =
-    f.eventId && f.targetAreaId && f.en.trim() && f.enBody.trim();
-  const blockReason = !complete ? 'Headline + body required' : '';
-  const sms = (s) => s.length;
+  const gaps = languageGaps(f);
+  const complete = Boolean(f.eventId && f.targetAreaId && gaps.length === 0);
   const target = created || null;
+  const savedMatches = draftMatchesForm(target, f);
+  const activeLang = MESSAGE_LANGS.find((lang) => lang.id === messageLang) || MESSAGE_LANGS[0];
+
+  function loadIntoComposer(alert) {
+    const eventId = typeof alert.eventId === 'object' ? alert.eventId?._id : alert.eventId;
+    const targetAreaId = typeof alert.targetAreaId === 'object' ? alert.targetAreaId?._id : alert.targetAreaId;
+    setF({
+      ...f,
+      eventId: eventId || f.eventId,
+      targetAreaId: targetAreaId || '',
+      level: alert.level || f.level,
+      en: textOf(alert.headline, 'en'),
+      enBody: textOf(alert.body, 'en'),
+      si: textOf(alert.headline, 'si'),
+      siBody: textOf(alert.body, 'si'),
+      ta: textOf(alert.headline, 'ta'),
+      taBody: textOf(alert.body, 'ta')
+    });
+    setCreated(alert);
+    setMsg('Loaded into composer — review, then Publish below.');
+  }
 
   async function publishTarget() {
     if (!target) return;
@@ -344,10 +402,31 @@ function AlertsTab() {
           <h4>Target area {curEvent && <span className="amber-tag">current: {curEvent.level}</span>}</h4>
           <select value={f.targetAreaId} onChange={set('targetAreaId')}>
             <option value="">Area…</option>
-            {areas.map((a) => <option key={a._id} value={a._id}>{a.name} ({a.district})</option>)}
+            {areas.map((a) => (
+              <option key={a._id} value={a._id}>
+                {a.name} ({Array.isArray(a.districts) && a.districts.length ? a.districts.join(', ') : a.district})
+              </option>
+            ))}
           </select>
-          {reach && <p className="reach">{reach.reach.toLocaleString()} recipients</p>}
-          {reach && <p>District {reach.district} · est. population {reach.estPopulation?.toLocaleString()}</p>}
+          {reach && (
+            <div>
+              <p className="reach">{Number(reach.reach || 0).toLocaleString()} eligible recipients</p>
+              <p>Opted out in this area: {Number(reach.excluded || 0).toLocaleString()}</p>
+              {reach.estPopulation != null && <p>Estimated population {Number(reach.estPopulation).toLocaleString()}</p>}
+              <p><b>Districts</b></p>
+              <ul className="reach-list">
+                {(reach.districts || []).map((row) => (
+                  <li key={row.district}>{row.district}: {Number(row.eligible || 0).toLocaleString()}</li>
+                ))}
+              </ul>
+              <p><b>Languages</b></p>
+              <ul className="reach-list">
+                <li>English: {Number(reach.languages?.en || 0).toLocaleString()}</li>
+                <li>Sinhala: {Number(reach.languages?.si || 0).toLocaleString()}</li>
+                <li>Tamil: {Number(reach.languages?.ta || 0).toLocaleString()}</li>
+              </ul>
+            </div>
+          )}
           <h4>Severity</h4>
           <div className="ladder">
             {LEVELS.map((l) => (
@@ -371,21 +450,35 @@ function AlertsTab() {
         </div>
         <div>
           <h4>Message</h4>
+          <nav className="tabs" aria-label="Warning language">
+            {MESSAGE_LANGS.map((lang) => (
+              <button key={lang.id} type="button" disabled={messageLang === lang.id} onClick={() => setMessageLang(lang.id)}>
+                {lang.label}
+              </button>
+            ))}
+          </nav>
           <div className="form">
-            <input placeholder="Headline" value={f.en} onChange={set('en')} />
-            <input placeholder="Body" value={f.enBody} onChange={set('enBody')} />
-            <span className={`smscount ${(f.enBody || '').length > 160 ? 'over' : ''}`}>
-              SMS {sms(f.enBody || '')}/160
-            </span>
+            <label htmlFor="alert-headline">{activeLang.label} headline</label>
+            <input id="alert-headline" value={f[activeLang.head]} onChange={set(activeLang.head)} />
+            <label htmlFor="alert-body">{activeLang.label} body</label>
+            <input id="alert-body" value={f[activeLang.body]} onChange={set(activeLang.body)} />
+            {MESSAGE_LANGS.map((lang) => (
+              <span key={lang.id} className={`smscount ${(f[lang.body] || '').length > 160 ? 'over' : ''}`}>
+                {lang.label} SMS {(f[lang.body] || '').length}/160
+              </span>
+            ))}
           </div>
+          {gaps.map((gap) => <p key={gap} className="error">{gap}</p>)}
         </div>
       </div>
       <div className="commitbar">
-        <button onClick={create}>Save draft{reach ? ` — reaches ${reach.reach.toLocaleString()}` : ''}</button>
-        <button onClick={publishTarget} disabled={!target || !complete}>
+        <button onClick={create}>Save draft{reach ? ` — reaches ${Number(reach.reach || 0).toLocaleString()}` : ''}</button>
+        <button onClick={publishTarget} disabled={!target || !complete || !savedMatches}>
           Publish{target ? ` v${target.version}` : ''}
         </button>
-        {(!target || !complete) && <span className="error">{!target ? 'Save a draft first. ' : ''}{blockReason}</span>}
+        {!target && <span className="error">Save a draft first.</span>}
+        {target && !complete && <span className="error">Publish stays disabled until every language has a headline and a body.</span>}
+        {target && complete && !savedMatches && <span className="error">Save a new draft before publishing so these languages are stored.</span>}
       </div>
       {msg && <p className={msg.startsWith('Draft') || msg.startsWith('publish') || msg.startsWith('retry') ? 'ok' : 'error'}>{msg}</p>}
       <h3>Alerts</h3>
@@ -414,7 +507,7 @@ function AlertsTab() {
               <p className="coverage">Every citizen received at least one channel.</p>
             )}
             <div className="row">
-              {a.status === 'DRAFT' && <button onClick={() => { setCreated(a); setMsg('Loaded into composer — review, then Publish below.'); }}>Load into composer</button>}
+              {a.status === 'DRAFT' && <button onClick={() => loadIntoComposer(a)}>Load into composer</button>}
               {a.status === 'PUBLISHED' && <button onClick={() => reissue(a._id)}>Reissue update</button>}
               <button onClick={() => act(a._id, 'cancel', { reason: 'withdrawn by DMC' })}>Cancel</button>
             </div>

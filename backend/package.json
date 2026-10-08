@@ -6,7 +6,9 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test --test-concurrency=1 tests/alerts.test.js tests/shelters.test.js tests/dispatch.test.js",
+    "test:coverage": "node --test --test-concurrency=1 --experimental-test-coverage --test-coverage-include=src/**/*.js --test-coverage-exclude=tests/** tests/alerts.test.js tests/shelters.test.js tests/dispatch.test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

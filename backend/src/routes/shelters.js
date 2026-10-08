@@ -51,6 +51,27 @@ async function refreshStatus(shelter) {
   return shelter;
 }
 
+// Set status from the occupancy currently stored. The update matches that
+// occupancy, so a concurrent check-in is not overwritten with a stale status.
+async function syncOpenStatus(shelterId) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const current = await Shelter.findById(shelterId);
+    if (!current || ['PLANNED', 'CLOSED'].includes(current.status)) return current;
+    const status = occupancyStatus(current.occupancy, current.capacity);
+    const updated = await Shelter.findOneAndUpdate(
+      { _id: shelterId, occupancy: current.occupancy, status: { $nin: ['PLANNED', 'CLOSED'] } },
+      { $set: { status } },
+      { returnDocument: 'after' }
+    );
+    if (updated) return updated;
+  }
+  return Shelter.findById(shelterId);
+}
+
+function isDuplicateKey(err) {
+  return err?.code === 11000;
+}
+
 function shelterView(shelter, extra = {}) {
   return {
     shelter,
@@ -189,29 +210,66 @@ router.post('/shelters/:id/checkin', requireRole(...OPERATE), validate(checkinSc
     if (!['OPEN', 'NEARLY_FULL'].includes(shelter.status)) {
       return res.status(409).json({ error: `Shelter is ${shelter.status} — cannot check in` });
     }
-    if (shelter.capacity - shelter.occupancy < req.body.householdSize) {
-      const alternate = await findAlternate(shelter);
+
+    const householdSize = req.body.householdSize;
+    const claimed = await Shelter.findOneAndUpdate(
+      {
+        _id: shelter._id,
+        status: { $in: ['OPEN', 'NEARLY_FULL'] },
+        $expr: { $lte: [{ $add: ['$occupancy', householdSize] }, '$capacity'] }
+      },
+      { $inc: { occupancy: householdSize } },
+      { returnDocument: 'after' }
+    );
+    if (!claimed) {
+      const current = await Shelter.findById(shelter._id);
+      if (!current) return res.status(404).json({ error: 'Shelter not found' });
+      if (!['OPEN', 'NEARLY_FULL'].includes(current.status)) {
+        return res.status(409).json({ error: `Shelter is ${current.status} — cannot check in` });
+      }
+      const alternate = await findAlternate(current);
       return res.status(409).json({ error: 'Shelter full', alternate });
     }
 
-    const evacuee = await Evacuee.create({
-      fullName: req.body.name,
-      contactNo: req.body.contactNo,
-      householdSize: req.body.householdSize
-    });
-    const record = await EvacueeRecord.create({
-      evacueeId: evacuee._id,
-      shelterId: shelter._id,
-      specialNeeds: req.body.specialNeeds,
-      clientUUID: req.body.clientUUID
-    });
-    shelter.occupancy += evacuee.householdSize;
-    await refreshStatus(shelter);
+    let evacuee = null;
+    let record;
+    try {
+      evacuee = await Evacuee.create({
+        fullName: req.body.name,
+        contactNo: req.body.contactNo,
+        householdSize
+      });
+      record = await EvacueeRecord.create({
+        evacueeId: evacuee._id,
+        shelterId: shelter._id,
+        specialNeeds: req.body.specialNeeds,
+        clientUUID: req.body.clientUUID
+      });
+    } catch (err) {
+      if (evacuee) await Evacuee.deleteOne({ _id: evacuee._id });
+      await Shelter.updateOne(
+        { _id: shelter._id, occupancy: { $gte: householdSize } },
+        { $inc: { occupancy: -householdSize } }
+      );
+      await syncOpenStatus(shelter._id);
+      if (isDuplicateKey(err)) {
+        const dup = await EvacueeRecord.findOne({ clientUUID: req.body.clientUUID }).populate('evacueeId');
+        if (dup) return res.json({ record: dup, deduped: true });
+      }
+      throw err;
+    }
+
+    await syncOpenStatus(shelter._id);
+    const fresh = await Shelter.findById(shelter._id);
     recordAudit(req.user._id.toString(), 'SHELTER_CHECKIN', 'EvacueeRecord', record._id.toString(), null, {
       shelter: shelter._id.toString(),
       specialNeeds: !!req.body.specialNeeds
     });
-    res.status(201).json({ record: await record.populate('evacueeId'), ...shelterView(shelter), ...(shelter.status !== 'OPEN' ? { notice: `Shelter now ${shelter.status}` } : {}) });
+    res.status(201).json({
+      record: await record.populate('evacueeId'),
+      ...shelterView(fresh),
+      ...(fresh.status !== 'OPEN' ? { notice: `Shelter now ${fresh.status}` } : {})
+    });
   } catch (err) {
     next(err);
   }
@@ -225,15 +283,28 @@ router.post(
     try {
       const shelter = await Shelter.findById(req.params.id);
       if (!shelter) return res.status(404).json({ error: 'Shelter not found' });
-      const record = await EvacueeRecord.findOne({ _id: req.body.recordId, shelterId: shelter._id }).populate('evacueeId');
-      if (!record) return res.status(404).json({ error: 'Check-in record not found in this shelter' });
-      if (record.checkOutAt) return res.status(409).json({ error: 'Already checked out' });
-      record.checkOutAt = new Date();
-      await record.save();
-      shelter.occupancy = Math.max(0, shelter.occupancy - (record.evacueeId?.householdSize || 1));
-      await refreshStatus(shelter);
+      const record = await EvacueeRecord.findOneAndUpdate(
+        { _id: req.body.recordId, shelterId: shelter._id, checkOutAt: null },
+        { $set: { checkOutAt: new Date() } },
+        { returnDocument: 'after' }
+      ).populate('evacueeId');
+      if (!record) {
+        const existing = await EvacueeRecord.findOne({ _id: req.body.recordId, shelterId: shelter._id });
+        if (!existing) return res.status(404).json({ error: 'Check-in record not found in this shelter' });
+        return res.status(409).json({ error: 'Already checked out' });
+      }
+      const size = record.evacueeId?.householdSize || 1;
+      // Subtract only while the counter still contains this household.
+      // A missed match leaves occupancy as it is, including any newer check-in.
+      await Shelter.findOneAndUpdate(
+        { _id: shelter._id, occupancy: { $gte: size } },
+        { $inc: { occupancy: -size } },
+        { returnDocument: 'after' }
+      );
+      await syncOpenStatus(shelter._id);
+      const fresh = await Shelter.findById(shelter._id);
       recordAudit(req.user._id.toString(), 'SHELTER_CHECKOUT', 'EvacueeRecord', record._id.toString());
-      res.json({ record, ...shelterView(shelter) });
+      res.json({ record, ...shelterView(fresh) });
     } catch (err) {
       next(err);
     }

@@ -19,9 +19,19 @@ async function releaseOrderResources(order, actorId, why) {
 }
 
 // Ack timeout: SENT + silence past ACK_TIMEOUT_MS => unassign, back to RESERVED.
+// Assign moves the resource to DEPLOYED while the line stays RESERVED, so the
+// resource has to be restored before the order is saved. A missing resource,
+// or one no longer DEPLOYED, is left unchanged.
 async function sweepAckTimeouts(now) {
   const stale = await DispatchOrder.find({ status: 'SENT', notifiedAt: { $lt: new Date(now - ACK_TIMEOUT_MS) } });
   for (const order of stale) {
+    for (const item of order.items || []) {
+      if (!item.resourceId || item.status !== 'RESERVED') continue;
+      await Resource.updateOne(
+        { _id: item.resourceId, status: 'DEPLOYED' },
+        { $set: { status: 'RESERVED' } }
+      );
+    }
     order.teamLeadId = null;
     order.status = 'RESERVED';
     order.notifiedAt = null;

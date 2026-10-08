@@ -7,6 +7,8 @@ const receiptSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     channel: { type: String, enum: CHANNELS, required: true },
     state: { type: String, enum: ['PENDING', 'DELIVERED', 'FAILED'], default: 'PENDING' },
+    language: { type: String, enum: ['en', 'si', 'ta'], default: 'en' },
+    headline: { type: String, default: '' },
     sentAt: { type: Date, default: Date.now }
   },
   { timestamps: true }
