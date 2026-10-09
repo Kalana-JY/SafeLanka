@@ -16,10 +16,18 @@ function isolatedMongod() {
   fs.mkdirSync(dir, { recursive: true });
   const dest = path.join(dir, 'mongod.exe');
   if (!fs.existsSync(dest)) {
-    const source = path.join(os.homedir(), '.cache', 'mongodb-binaries', 'mongod-x64-win32-7.0.24.exe');
-    fs.copyFileSync(source, dest);
+    const cacheDir = path.join(os.homedir(), '.cache', 'mongodb-binaries');
+    let source = '';
+    if (fs.existsSync(cacheDir)) {
+      const files = fs.readdirSync(cacheDir);
+      const match = files.find((f) => f.startsWith('mongod') && f.endsWith('.exe')) || files[0];
+      if (match) source = path.join(cacheDir, match);
+    }
+    if (source && fs.existsSync(source)) {
+      fs.copyFileSync(source, dest);
+    }
   }
-  return dest;
+  return fs.existsSync(dest) ? dest : undefined;
 }
 
 export async function startTestServer() {
@@ -27,9 +35,10 @@ export async function startTestServer() {
   process.env.JWT_REFRESH_SECRET = 'test-only-refresh';
   // A separate binary copy avoids the cached mongod.exe, which may be locked
   // by a running development server. Tests never use that server or its data.
-  mongo = await MongoMemoryServer.create({
-    binary: { systemBinary: isolatedMongod() }
-  });
+  const bin = isolatedMongod();
+  mongo = await MongoMemoryServer.create(bin ? {
+    binary: { systemBinary: bin }
+  } : {});
   await mongoose.connect(mongo.getUri());
   const { default: app } = await import('../src/app.js');
   server = app.listen(0, '127.0.0.1');
